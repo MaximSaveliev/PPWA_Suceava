@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
 from app.config.database import get_db
-from app.dal.plan_dal import PlanDAL
+from app.services.plan_service import PlanService
 from app.schemas.plan import PlanResponse, PlanCreate, PlanUpdate
 from app.utils.dependencies import get_current_admin_user
 from app.models.user import User
@@ -16,19 +16,21 @@ router = APIRouter(prefix="/plans", tags=["Plans"])
 @router.get("/", response_model=List[PlanResponse])
 def get_all_plans(
     include_deleted: bool = False,
+    use_cache: bool = True,
     db: Session = Depends(get_db)
 ):
-    plan_dal = PlanDAL(db)
-    return plan_dal.get_all(include_deleted=include_deleted)
+    plan_service = PlanService(db)
+    return plan_service.get_all_plans(include_deleted=include_deleted, use_cache=use_cache)
 
 
 @router.get("/{plan_id}", response_model=PlanResponse)
 def get_plan(
     plan_id: int,
+    use_cache: bool = True,
     db: Session = Depends(get_db)
 ):
-    plan_dal = PlanDAL(db)
-    plan = plan_dal.get_by_id(plan_id, include_deleted=False)
+    plan_service = PlanService(db)
+    plan = plan_service.get_plan_by_id(plan_id, include_deleted=False, use_cache=use_cache)
     if not plan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plan not found")
     return plan
@@ -41,9 +43,9 @@ def create_plan(
     db: Session = Depends(get_db)
 ):
     logger.info(f"Admin {current_user.username} creating plan: {plan_data.name}")
-    plan_dal = PlanDAL(db)
+    plan_service = PlanService(db)
     
-    existing = plan_dal.get_by_name(plan_data.name, include_deleted=True)
+    existing = plan_service.get_plan_by_name(plan_data.name, include_deleted=True, use_cache=False)
     if existing:
         logger.warning(f"Plan creation failed - name already exists: {plan_data.name}")
         raise HTTPException(
@@ -51,13 +53,7 @@ def create_plan(
             detail="Plan with this name already exists"
         )
     
-    plan = plan_dal.create(
-        name=plan_data.name,
-        max_operations=plan_data.max_operations,
-        price=plan_data.price,
-        description=plan_data.description
-    )
-    logger.info(f"Plan created: {plan.name} (ID: {plan.id}, Max ops: {plan.max_operations}, Price: {plan.price})")
+    return plan_service.create_plan(plan_data)
     return plan
 
 
@@ -69,33 +65,21 @@ def update_plan(
     db: Session = Depends(get_db)
 ):
     logger.info(f"Admin {current_user.username} updating plan {plan_id}")
-    plan_dal = PlanDAL(db)
-    plan = plan_dal.get_by_id(plan_id, include_deleted=False)
+    plan_service = PlanService(db)
+    plan = plan_service.get_plan_by_id(plan_id, include_deleted=False, use_cache=False)
     
     if not plan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plan not found")
     
     if plan_data.name and plan_data.name != plan.name:
-        existing = plan_dal.get_by_name(plan_data.name, include_deleted=True)
+        existing = plan_service.get_plan_by_name(plan_data.name, include_deleted=True, use_cache=False)
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Plan with this name already exists"
             )
-        plan.name = plan_data.name
     
-    if plan_data.max_operations is not None:
-        plan.max_operations = plan_data.max_operations
-    
-    if plan_data.price is not None:
-        plan.price = plan_data.price
-    
-    if plan_data.description is not None:
-        plan.description = plan_data.description
-    
-    result = plan_dal.update(plan)
-    logger.info(f"Plan updated: {result.name} (ID: {plan_id})")
-    return result
+    return plan_service.update_plan(plan_id, plan_data)
 
 
 @router.delete("/{plan_id}/soft", response_model=PlanResponse)
@@ -105,15 +89,13 @@ def soft_delete_plan(
     db: Session = Depends(get_db)
 ):
     logger.info(f"Admin {current_user.username} soft deleting plan {plan_id}")
-    plan_dal = PlanDAL(db)
-    plan = plan_dal.get_by_id(plan_id, include_deleted=False)
+    plan_service = PlanService(db)
+    plan = plan_service.get_plan_by_id(plan_id, include_deleted=False, use_cache=False)
     
     if not plan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plan not found")
     
-    result = plan_dal.soft_delete(plan)
-    logger.info(f"Plan soft deleted: {result.name} (ID: {plan_id})")
-    return result
+    return plan_service.soft_delete_plan(plan_id)
 
 
 @router.post("/{plan_id}/restore", response_model=PlanResponse)
@@ -123,8 +105,8 @@ def restore_plan(
     db: Session = Depends(get_db)
 ):
     logger.info(f"Admin {current_user.username} restoring plan {plan_id}")
-    plan_dal = PlanDAL(db)
-    plan = plan_dal.get_by_id(plan_id, include_deleted=True)
+    plan_service = PlanService(db)
+    plan = plan_service.get_plan_by_id(plan_id, include_deleted=True, use_cache=False)
     
     if not plan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plan not found")
@@ -135,9 +117,7 @@ def restore_plan(
             detail="Plan is not deleted"
         )
     
-    result = plan_dal.restore(plan)
-    logger.info(f"Plan restored: {result.name} (ID: {plan_id})")
-    return result
+    return plan_service.restore_plan(plan_id)
 
 
 @router.delete("/{plan_id}/hard", status_code=status.HTTP_204_NO_CONTENT)
@@ -147,15 +127,14 @@ def hard_delete_plan(
     db: Session = Depends(get_db)
 ):
     logger.warning(f"Admin {current_user.username} hard deleting plan {plan_id}")
-    plan_dal = PlanDAL(db)
-    plan = plan_dal.get_by_id(plan_id, include_deleted=True)
+    plan_service = PlanService(db)
+    plan = plan_service.get_plan_by_id(plan_id, include_deleted=True, use_cache=False)
     
     if not plan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plan not found")
     
     try:
-        plan_dal.hard_delete(plan)
-        logger.info(f"Plan hard deleted: {plan.name} (ID: {plan_id})")
+        plan_service.hard_delete_plan(plan_id)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

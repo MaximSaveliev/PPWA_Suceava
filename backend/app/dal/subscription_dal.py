@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.models.subscription import Subscription
 from app.models.plan import Plan
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 class SubscriptionDAL:
@@ -26,10 +26,13 @@ class SubscriptionDAL:
         ).order_by(Subscription.start_date.desc()).all()
 
     def create(self, user_id: int, plan_id: int) -> Subscription:
+        now = datetime.now()
         subscription = Subscription(
             user_id=user_id,
             plan_id=plan_id,
-            operations_used=0
+            operations_used=0,
+            start_date=now,
+            end_date=now + timedelta(days=30)
         )
         self.db.add(subscription)
         self.db.commit()

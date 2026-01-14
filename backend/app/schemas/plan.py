@@ -1,12 +1,12 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional
 
 
 class PlanBase(BaseModel):
     name: str
-    max_operations: int
-    price: int
+    max_operations: int = Field(gt=0, le=2147483647, description="Maximum operations allowed (1 to 2,147,483,647)")
+    price: int = Field(ge=0, le=2147483647, description="Price in cents (0 to 2,147,483,647)")
     description: Optional[str] = None
 
 
@@ -16,8 +16,8 @@ class PlanCreate(PlanBase):
 
 class PlanUpdate(BaseModel):
     name: Optional[str] = None
-    max_operations: Optional[int] = None
-    price: Optional[int] = None
+    max_operations: Optional[int] = Field(None, gt=0, le=2147483647, description="Maximum operations allowed (1 to 2,147,483,647)")
+    price: Optional[int] = Field(None, ge=0, le=2147483647, description="Price in cents (0 to 2,147,483,647)")
     description: Optional[str] = None
 
 

@@ -6,6 +6,9 @@ from app.schemas.user import UserResponse, UserUpdate, UserWithSubscription
 from app.utils.dependencies import get_current_user, get_current_admin_user
 from app.models.user import User
 from typing import List
+from app.config.logging_config import get_logger
+
+logger = get_logger("user_controller")
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -67,5 +70,8 @@ def delete_user(
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
+    logger.info(f"Admin {current_user.username} deleting user {user_id}")
+    user_service = UserService(db)
+    user_service.delete_user(user_id)
     user_service = UserService(db)
     user_service.delete_user(user_id)

@@ -1,12 +1,18 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.controllers import auth_controller, user_controller, subscription_controller, image_controller, plan_controller
+from app.config.logging_config import setup_logging, get_logger
+
+setup_logging()
+logger = get_logger("main")
 
 app = FastAPI(
     title="Image Processing API",
     description="MVC-based FastAPI application for image processing with subscription plans",
     version="1.0.0"
 )
+
+logger.info("Application starting up")
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,6 +27,8 @@ app.include_router(user_controller.router, prefix="/api/v1")
 app.include_router(subscription_controller.router, prefix="/api/v1")
 app.include_router(image_controller.router, prefix="/api/v1")
 app.include_router(plan_controller.router, prefix="/api/v1")
+
+logger.info("All routers registered successfully")
 
 
 @app.get("/")

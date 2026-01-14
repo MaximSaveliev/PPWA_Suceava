@@ -4,6 +4,9 @@ from app.dal.plan_dal import PlanDAL
 from app.schemas.subscription import SubscriptionCreate, SubscriptionResponse
 from fastapi import HTTPException, status
 from datetime import datetime
+from app.config.logging_config import get_logger
+
+logger = get_logger("subscription_service")
 
 
 class SubscriptionService:
@@ -37,15 +40,18 @@ class SubscriptionService:
         return self._to_response(subscription)
 
     def upgrade_subscription(self, user_id: int, new_plan_id: int):
+        logger.info(f"Upgrading subscription for user {user_id} to plan {new_plan_id}")
         plan = self.plan_dal.get_by_id(new_plan_id)
         if not plan:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plan not found")
         
         current_subscription = self.subscription_dal.get_active_by_user_id(user_id)
         if not current_subscription:
+            logger.info(f"Creating first subscription for user {user_id}")
             return self.create_subscription(user_id, SubscriptionCreate(plan_id=new_plan_id))
         
         if current_subscription.plan_id == new_plan_id:
+            logger.warning(f"User {user_id} attempted to upgrade to current plan {new_plan_id}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Already subscribed to this plan"
@@ -56,17 +62,20 @@ class SubscriptionService:
         self.subscription_dal.update(current_subscription)
         
         new_subscription = self.subscription_dal.create(user_id=user_id, plan_id=new_plan_id)
+        logger.info(f"Subscription upgraded: user {user_id} from plan {current_subscription.plan_id} to {new_plan_id}")
         return self._to_response(new_subscription)
 
     def check_operations_available(self, user_id: int) -> bool:
         subscription = self.subscription_dal.get_active_by_user_id(user_id)
         if not subscription:
+            logger.warning(f"Operation check failed - no active subscription for user {user_id}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No active subscription"
             )
         
         if not self.subscription_dal.has_operations_remaining(subscription):
+            logger.warning(f"Operation limit reached for user {user_id} on plan {subscription.plan.name}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Operation limit reached for current plan"

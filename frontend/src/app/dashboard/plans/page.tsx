@@ -192,7 +192,7 @@ export default function PlansPage() {
                   <TableCell>{plan.id}</TableCell>
                   <TableCell className="font-medium">{plan.name}</TableCell>
                   <TableCell>{plan.max_operations}</TableCell>
-                  <TableCell>${plan.price.toFixed(2)}</TableCell>
+                  <TableCell>${(plan.price / 100).toFixed(2)}</TableCell>
                   <TableCell className="max-w-xs truncate">
                     {plan.description || 'No description'}
                   </TableCell>

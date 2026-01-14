@@ -6,6 +6,9 @@ from app.dal.plan_dal import PlanDAL
 from app.utils.security import hash_password
 from fastapi import HTTPException, status
 from typing import Optional
+from app.config.logging_config import get_logger
+
+logger = get_logger("user_service")
 
 
 class UserService:
@@ -70,10 +73,14 @@ class UserService:
         return result
 
     def create_user(self, user_data: UserCreate):
+        logger.info(f"Creating new user: {user_data.username} ({user_data.email})")
+        
         if self.user_dal.get_by_email(user_data.email):
+            logger.warning(f"User creation failed - email already exists: {user_data.email}")
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
         
         if self.user_dal.get_by_username(user_data.username):
+            logger.warning(f"User creation failed - username already exists: {user_data.username}")
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken")
         
         hashed_pwd = hash_password(user_data.password)
@@ -87,11 +94,15 @@ class UserService:
         free_plan = self.plan_dal.get_by_name("FREE")
         if free_plan:
             self.subscription_dal.create(user_id=user.id, plan_id=free_plan.id)
+            logger.info(f"User created successfully with FREE plan: {user.username} (ID: {user.id})")
+        else:
+            logger.warning(f"User created without subscription - FREE plan not found: {user.username} (ID: {user.id})")
         
         return user
 
     def update_user(self, user_id: int, user_data: UserUpdate):
         user = self.get_user_by_id(user_id)
+        logger.info(f"Updating user: {user.username} (ID: {user_id})")
         
         if user_data.email and user_data.email != user.email:
             if self.user_dal.get_by_email(user_data.email):
@@ -112,12 +123,18 @@ class UserService:
         if user_data.is_active is not None:
             user.is_active = user_data.is_active
         
+        logger.info(f"User updated successfully: {user.username} (ID: {user_id})")
         return self.user_dal.update(user)
 
     def delete_user(self, user_id: int):
         user = self.get_user_by_id(user_id)
+        logger.warning(f"Deleting user: {user.username} (ID: {user_id})")
         self.user_dal.delete(user)
+        logger.info(f"User deleted: {user.username} (ID: {user_id})")
 
     def deactivate_user(self, user_id: int):
         user = self.get_user_by_id(user_id)
-        return self.user_dal.deactivate(user)
+        logger.info(f"Deactivating user: {user.username} (ID: {user_id})")
+        result = self.user_dal.deactivate(user)
+        logger.info(f"User deactivated: {user.username} (ID: {user_id})")
+        return result

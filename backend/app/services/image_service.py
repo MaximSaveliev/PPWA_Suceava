@@ -6,6 +6,9 @@ from PIL import Image, ImageFilter
 import io
 from fastapi import HTTPException, status, UploadFile
 from typing import Optional
+from app.config.logging_config import get_logger
+
+logger = get_logger("image_service")
 
 
 class ImageService:
@@ -21,6 +24,7 @@ class ImageService:
         operation: ImageOperation,
         **kwargs
     ):
+        logger.info(f"Processing image for user {user_id}: {file.filename} - Operation: {operation.value}")
         self.subscription_service.check_operations_available(user_id)
         
         try:
@@ -58,10 +62,12 @@ class ImageService:
             )
             
             self.subscription_service.increment_operation_count(user_id)
+            logger.info(f"Image processed successfully: {file.filename} ({original_size} -> {processed_size})")
             
             return processed_data, file.filename, image_record
             
         except Exception as e:
+            logger.error(f"Image processing failed for user {user_id}: {file.filename} - {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Image processing failed: {str(e)}"
@@ -117,13 +123,16 @@ class ImageService:
         return image.filter(ImageFilter.GaussianBlur(radius))
 
     def delete_image(self, image_id: int, user_id: int) -> None:
+        logger.info(f"Deleting image {image_id} for user {user_id}")
         image = self.image_dal.get_by_id(image_id)
         
         if not image:
+            logger.warning(f"Image deletion failed - not found: {image_id}")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image record not found")
         
-        # Verify ownership
         if image.user_id != user_id:
+            logger.warning(f"Unauthorized image deletion attempt: user {user_id} tried to delete image {image_id}")
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this image")
         
         self.image_dal.delete(image)
+        logger.info(f"Image deleted successfully: {image_id}")

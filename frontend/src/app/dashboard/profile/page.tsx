@@ -7,7 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { User, Plan, Subscription, ImageRecord } from '@/types';
+import { Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -22,9 +25,36 @@ export default function ProfilePage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const [deleteDialog, setDeleteDialog] = useState(false);
+  const [imageToDelete, setImageToDelete] = useState<number | null>(null);
+  const [imageViewDialog, setImageViewDialog] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<ImageRecord | null>(null);
+  const [imageBlobUrls, setImageBlobUrls] = useState<{[key: number]: string}>({});
+
   useEffect(() => {
     loadUserData();
   }, []);
+
+  useEffect(() => {
+    const loadImages = async () => {
+      const urls: {[key: number]: string} = {};
+      for (const record of history) {
+        try {
+          const blob = await imageApi.getImage(record.id);
+          urls[record.id] = URL.createObjectURL(blob);
+        } catch (err) {
+          console.error(`Failed to load image ${record.id}`);
+        }
+      }
+      setImageBlobUrls(urls);
+    };
+    if (history.length > 0) {
+      loadImages();
+    }
+    return () => {
+      Object.values(imageBlobUrls).forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [history]);
 
   const loadUserData = async () => {
     try {
@@ -38,7 +68,16 @@ export default function ProfilePage() {
       setEmail(userData.email);
       setUsername(userData.username);
       setSubscription(subData);
-      setPlans(plansData);
+      
+      // Sort plans: FREE, BASIC, PREMIUM, ENTERPRISE
+      const planOrder = ['FREE', 'BASIC', 'PREMIUM', 'ENTERPRISE'];
+      const sortedPlans = plansData.sort((a: Plan, b: Plan) => {
+        const aIndex = planOrder.indexOf(a.name.toUpperCase());
+        const bIndex = planOrder.indexOf(b.name.toUpperCase());
+        return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
+      });
+      setPlans(sortedPlans);
+      
       setHistory(historyData);
     } catch (err) {
       setError('Failed to load user data');
@@ -75,6 +114,41 @@ export default function ProfilePage() {
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Upgrade failed');
     }
+  };
+
+  const handleDeleteImage = async (imageId: number) => {
+    setImageToDelete(imageId);
+    setDeleteDialog(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!imageToDelete) return;
+
+    try {
+      await imageApi.delete(imageToDelete);
+      setHistory(history.filter(img => img.id !== imageToDelete));
+      setDeleteDialog(false);
+      setImageToDelete(null);
+      toast.success('Image deleted successfully', {
+        description: 'The image record has been removed from your history',
+      });
+    } catch (err: any) {
+      setDeleteDialog(false);
+      setImageToDelete(null);
+      toast.error('Failed to delete image', {
+        description: err.response?.data?.detail || 'An error occurred while deleting the image',
+      });
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeleteDialog(false);
+    setImageToDelete(null);
+  };
+
+  const handleViewImage = (record: ImageRecord) => {
+    setSelectedImage(record);
+    setImageViewDialog(true);
   };
 
   if (loading) {
@@ -173,26 +247,44 @@ export default function ProfilePage() {
                 {plans.map((plan) => (
                   <div
                     key={plan.id}
-                    className={`p-4 border rounded-md ${
-                      plan.id === subscription?.plan_id ? 'border-blue-500 bg-blue-50' : ''
+                    className={`p-6 border-2 rounded-lg transition-all ${
+                      plan.id === subscription?.plan_id 
+                        ? 'border-blue-500 bg-blue-50 shadow-md' 
+                        : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
                     }`}
                   >
-                    <h3 className="font-semibold text-lg">{plan.name}</h3>
-                    <p className="text-2xl font-bold mt-2">
-                      ${(plan.price / 100).toFixed(2)}
-                      <span className="text-sm text-muted-foreground">/month</span>
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {plan.max_operations} operations/month
-                    </p>
-                    <p className="text-sm mt-2">{plan.description}</p>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-bold text-xl">{plan.name}</h3>
+                      {plan.id === subscription?.plan_id && (
+                        <span className="px-3 py-1 bg-blue-500 text-white text-xs rounded-full font-medium">
+                          Current
+                        </span>
+                      )}
+                    </div>
+                    <div className="mb-4">
+                      <p className="text-3xl font-bold text-gray-900">
+                        ${(plan.price / 100).toFixed(2)}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        per month
+                      </p>
+                    </div>
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center text-sm">
+                        <span className="font-semibold text-gray-700">
+                          {plan.max_operations.toLocaleString()}
+                        </span>
+                        <span className="text-muted-foreground ml-1">operations/month</span>
+                      </div>
+                      <p className="text-sm text-gray-600">{plan.description}</p>
+                    </div>
                     {plan.id !== subscription?.plan_id && (
                       <Button
                         onClick={() => handleUpgradePlan(plan.id)}
-                        className="w-full mt-4"
+                        className="w-full"
                         variant={plan.id > (subscription?.plan_id || 0) ? 'default' : 'outline'}
                       >
-                        {plan.id > (subscription?.plan_id || 0) ? 'Upgrade' : 'Downgrade'}
+                        {plan.id > (subscription?.plan_id || 0) ? 'Upgrade Plan' : 'Switch Plan'}
                       </Button>
                     )}
                   </div>
@@ -214,9 +306,33 @@ export default function ProfilePage() {
               ) : (
                 <div className="space-y-2">
                   {history.map((record) => (
-                    <div key={record.id} className="flex items-center justify-between p-3 border rounded-md">
-                      <div>
-                        <p className="font-medium">{record.filename}</p>
+                    <div key={record.id} className="flex items-center gap-4 p-3 border rounded-md hover:bg-gray-50 transition-colors">
+                      <div 
+                        className="shrink-0 w-16 h-16 rounded border bg-gray-100 overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => handleViewImage(record)}
+                      >
+                        {imageBlobUrls[record.id] ? (
+                          <img 
+                            src={imageBlobUrls[record.id]}
+                            alt={record.filename}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2">
+                              <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                              <path d="M21 15l-5-5L5 21"></path>
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate" title={record.filename}>
+                          {record.filename.length > 40 
+                            ? record.filename.substring(0, 40) + '...' 
+                            : record.filename}
+                        </p>
                         <p className="text-sm text-muted-foreground">
                           Operation: {record.operation} | {record.original_size} → {record.processed_size}
                         </p>
@@ -224,6 +340,14 @@ export default function ProfilePage() {
                           {new Date(record.created_at).toLocaleString()}
                         </p>
                       </div>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDeleteImage(record.id)}
+                        className="shrink-0"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -232,6 +356,61 @@ export default function ProfilePage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Image Record</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this image record? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelDelete}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={imageViewDialog} onOpenChange={setImageViewDialog}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] w-auto h-auto p-0 overflow-hidden">
+          <div className="relative w-full h-full flex flex-col">
+            <DialogHeader className="px-6 pt-6 pb-4 shrink-0">
+              <DialogTitle>{selectedImage?.filename}</DialogTitle>
+              <DialogDescription>
+                {selectedImage?.operation} | {selectedImage?.original_size} → {selectedImage?.processed_size}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex items-center justify-center bg-gray-50 px-6 pb-6 overflow-hidden min-h-0 flex-1">
+              {selectedImage && imageBlobUrls[selectedImage.id] ? (
+                <img 
+                  src={imageBlobUrls[selectedImage.id]}
+                  alt={selectedImage.filename}
+                  className="object-contain"
+                  style={{maxHeight: '80vh', maxWidth: '100%', width: 'auto', height: 'auto'}}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-64">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="1">
+                    <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <path d="M21 15l-5-5L5 21"></path>
+                  </svg>
+                </div>
+              )}
+            </div>
+            <DialogFooter className="px-6 pb-6 shrink-0">
+              <Button onClick={() => setImageViewDialog(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

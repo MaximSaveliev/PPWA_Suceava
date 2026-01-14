@@ -8,8 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { User } from '@/types';
 import { Trash2, CheckCircle, XCircle, Pencil } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -24,6 +26,8 @@ export default function AdminPage() {
     role: 'user' as 'user' | 'admin',
     is_active: true
   });
+  const [deleteDialog, setDeleteDialog] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   useEffect(() => {
     loadCurrentUser();
@@ -50,15 +54,34 @@ export default function AdminPage() {
     }
   };
 
-  const handleDeleteUser = async (userId: number) => {
-    if (!confirm('Are you sure you want to delete this user?')) return;
+  const handleDeleteUser = async (user: User) => {
+    setUserToDelete(user);
+    setDeleteDialog(true);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) return;
 
     try {
-      await userApi.delete(userId);
-      setUsers(users.filter((u) => u.id !== userId));
+      await userApi.delete(userToDelete.id);
+      setUsers(users.filter((u) => u.id !== userToDelete.id));
+      setDeleteDialog(false);
+      setUserToDelete(null);
+      toast.success('User deleted successfully', {
+        description: `User ${userToDelete.username} has been removed`,
+      });
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to delete user');
+      setDeleteDialog(false);
+      setUserToDelete(null);
+      toast.error('Failed to delete user', {
+        description: err.response?.data?.detail || 'An error occurred',
+      });
     }
+  };
+
+  const cancelDeleteUser = () => {
+    setDeleteDialog(false);
+    setUserToDelete(null);
   };
 
   const handleEditUser = (user: User) => {
@@ -187,7 +210,7 @@ export default function AdminPage() {
                           <Button
                             variant="destructive"
                             size="sm"
-                            onClick={() => handleDeleteUser(user.id)}
+                            onClick={() => handleDeleteUser(user)}
                             disabled={user.role === 'admin'}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -333,6 +356,25 @@ export default function AdminPage() {
           </Card>
         </div>
       )}
+
+      <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete User</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete user {userToDelete?.username}? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelDeleteUser}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteUser}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

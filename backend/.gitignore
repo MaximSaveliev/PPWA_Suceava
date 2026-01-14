@@ -16,3 +16,5 @@ uploads/
 .idea/
 .vscode/
 *.log
+alembic/
+*.ini

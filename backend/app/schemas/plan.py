@@ -23,6 +23,8 @@ class PlanUpdate(BaseModel):
 
 class PlanResponse(PlanBase):
     id: int
+    is_deleted: bool
+    deleted_at: Optional[datetime] = None
     created_at: datetime
 
     class Config:

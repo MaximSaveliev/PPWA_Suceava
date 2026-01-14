@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.controllers import auth_controller, user_controller, subscription_controller, image_controller
+from app.controllers import auth_controller, user_controller, subscription_controller, image_controller, plan_controller
 
 app = FastAPI(
     title="Image Processing API",
@@ -20,6 +20,7 @@ app.include_router(auth_controller.router, prefix="/api/v1")
 app.include_router(user_controller.router, prefix="/api/v1")
 app.include_router(subscription_controller.router, prefix="/api/v1")
 app.include_router(image_controller.router, prefix="/api/v1")
+app.include_router(plan_controller.router, prefix="/api/v1")
 
 
 @app.get("/")

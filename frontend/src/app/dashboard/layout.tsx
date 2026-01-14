@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { LogOut, User, Image as ImageIcon, Shield } from 'lucide-react';
+import { LogOut, User, Image as ImageIcon, Shield, Package } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { userApi } from '@/lib/api';
 import type { User as UserType } from '@/types';
@@ -56,12 +56,20 @@ export default function DashboardLayout({
                   </Button>
                 </Link>
                 {currentUser?.role === 'admin' && (
-                  <Link href="/dashboard/admin">
-                    <Button variant="ghost" size="sm">
-                      <Shield className="mr-2 h-4 w-4" />
-                      Admin
-                    </Button>
-                  </Link>
+                  <>
+                    <Link href="/dashboard/admin">
+                      <Button variant="ghost" size="sm">
+                        <Shield className="mr-2 h-4 w-4" />
+                        Admin
+                      </Button>
+                    </Link>
+                    <Link href="/dashboard/plans">
+                      <Button variant="ghost" size="sm">
+                        <Package className="mr-2 h-4 w-4" />
+                        Plans
+                      </Button>
+                    </Link>
+                  </>
                 )}
               </div>
             </div>

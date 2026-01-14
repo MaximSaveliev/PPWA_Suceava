@@ -41,5 +41,12 @@ class ImageDAL:
         self.db.delete(image_record)
         self.db.commit()
 
+    def delete_by_id(self, image_id: int) -> bool:
+        image_record = self.get_by_id(image_id)
+        if image_record:
+            self.delete(image_record)
+            return True
+        return False
+
     def count_by_user_id(self, user_id: int) -> int:
         return self.db.query(ImageRecord).filter(ImageRecord.user_id == user_id).count()

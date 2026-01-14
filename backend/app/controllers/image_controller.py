@@ -79,3 +79,13 @@ def get_processed_image(
         media_type="image/png",
         headers={"Content-Disposition": f"attachment; filename={image.filename}"}
     )
+
+
+@router.delete("/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_image_record(
+    image_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    image_service = ImageService(db)
+    image_service.delete_image(image_id, current_user.id)

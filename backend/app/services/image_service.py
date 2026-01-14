@@ -115,3 +115,15 @@ class ImageService:
     def _blur_image(self, image: Image.Image, kwargs: dict) -> Image.Image:
         radius = kwargs.get('blur_radius', 5)
         return image.filter(ImageFilter.GaussianBlur(radius))
+
+    def delete_image(self, image_id: int, user_id: int) -> None:
+        image = self.image_dal.get_by_id(image_id)
+        
+        if not image:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image record not found")
+        
+        # Verify ownership
+        if image.user_id != user_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this image")
+        
+        self.image_dal.delete(image)

@@ -17,6 +17,8 @@ export interface Plan {
   price: number;
   description: string;
   created_at: string;
+  is_deleted?: boolean;
+  deleted_at?: string;
 }
 
 export interface Subscription {
@@ -40,6 +42,7 @@ export interface ImageRecord {
   original_size?: string;
   processed_size?: string;
   created_at: string;
+  image_data?: string;
 }
 
 export type ImageOperation = 'crop' | 'grayscale' | 'sepia' | 'resize' | 'rotate' | 'blur';

@@ -24,6 +24,8 @@ export default function DashboardPage() {
   const [y, setY] = useState('');
   const [angle, setAngle] = useState('');
   const [blurRadius, setBlurRadius] = useState('');
+  const [keepAspectRatio, setKeepAspectRatio] = useState(true);
+  const [aspectRatio, setAspectRatio] = useState(1);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -31,9 +33,17 @@ export default function DashboardPage() {
     const file = e.target.files?.[0];
     if (file) {
       setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
       setProcessedUrl('');
       setError('');
+      
+      // Calculate aspect ratio
+      const img = new Image();
+      img.onload = () => {
+        setAspectRatio(img.width / img.height);
+      };
+      img.src = url;
     }
   };
 
@@ -101,14 +111,48 @@ export default function DashboardPage() {
         );
       case 'resize':
         return (
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Width</Label>
-              <Input type="number" value={width} onChange={(e) => setWidth(e.target.value)} placeholder="800" />
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="keepAspectRatio"
+                checked={keepAspectRatio}
+                onChange={(e) => setKeepAspectRatio(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="keepAspectRatio" className="cursor-pointer">
+                Keep Aspect Ratio
+              </Label>
             </div>
-            <div className="space-y-2">
-              <Label>Height</Label>
-              <Input type="number" value={height} onChange={(e) => setHeight(e.target.value)} placeholder="600" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Width</Label>
+                <Input 
+                  type="number" 
+                  value={width} 
+                  onChange={(e) => {
+                    setWidth(e.target.value);
+                    if (keepAspectRatio && e.target.value && aspectRatio) {
+                      setHeight(Math.round(parseInt(e.target.value) / aspectRatio).toString());
+                    }
+                  }} 
+                  placeholder="800" 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Height</Label>
+                <Input 
+                  type="number" 
+                  value={height} 
+                  onChange={(e) => {
+                    setHeight(e.target.value);
+                    if (keepAspectRatio && e.target.value && aspectRatio) {
+                      setWidth(Math.round(parseInt(e.target.value) * aspectRatio).toString());
+                    }
+                  }} 
+                  placeholder="600" 
+                />
+              </div>
             </div>
           </div>
         );
@@ -158,10 +202,16 @@ export default function DashboardPage() {
                 <Button
                   variant="outline"
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full"
+                  className="w-full justify-start"
                 >
-                  <Upload className="mr-2 h-4 w-4" />
-                  {selectedFile ? selectedFile.name : 'Choose Image'}
+                  <Upload className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">
+                    {selectedFile 
+                      ? (selectedFile.name.length > 25 
+                          ? selectedFile.name.substring(0, 25) + '...' 
+                          : selectedFile.name)
+                      : 'Choose Image'}
+                  </span>
                 </Button>
               </div>
             </div>
@@ -169,7 +219,9 @@ export default function DashboardPage() {
             {previewUrl && (
               <div className="space-y-2">
                 <Label>Preview</Label>
-                <img src={previewUrl} alt="Preview" className="w-full rounded-md border" />
+                <div className="max-h-64 overflow-hidden rounded-md border bg-gray-50 flex items-center justify-center">
+                  <img src={previewUrl} alt="Preview" className="max-h-64 w-auto object-contain" />
+                </div>
               </div>
             )}
 
@@ -212,7 +264,9 @@ export default function DashboardPage() {
           <CardContent className="space-y-4">
             {processedUrl ? (
               <>
-                <img src={processedUrl} alt="Processed" className="w-full rounded-md border" />
+                <div className="max-h-96 overflow-hidden rounded-md border bg-gray-50 flex items-center justify-center">
+                  <img src={processedUrl} alt="Processed" className="max-h-96 w-auto object-contain" />
+                </div>
                 <Button onClick={handleDownload} className="w-full">
                   <Download className="mr-2 h-4 w-4" />
                   Download Image

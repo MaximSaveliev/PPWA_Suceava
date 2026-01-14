@@ -94,4 +94,43 @@ export const imageApi = {
     const response = await api.get('/images/history');
     return response.data;
   },
+  getImage: async (imageId: number) => {
+    const response = await api.get(`/images/${imageId}`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+  delete: async (imageId: number) => {
+    await api.delete(`/images/${imageId}`);
+  },
+};
+
+export const planApi = {
+  getAll: async (includeDeleted: boolean = false) => {
+    const response = await api.get('/plans/', { params: { include_deleted: includeDeleted } });
+    return response.data;
+  },
+  getById: async (planId: number) => {
+    const response = await api.get(`/plans/${planId}`);
+    return response.data;
+  },
+  create: async (data: any) => {
+    const response = await api.post('/plans/', data);
+    return response.data;
+  },
+  update: async (planId: number, data: any) => {
+    const response = await api.put(`/plans/${planId}`, data);
+    return response.data;
+  },
+  softDelete: async (planId: number) => {
+    const response = await api.delete(`/plans/${planId}/soft`);
+    return response.data;
+  },
+  restore: async (planId: number) => {
+    const response = await api.post(`/plans/${planId}/restore`);
+    return response.data;
+  },
+  hardDelete: async (planId: number) => {
+    await api.delete(`/plans/${planId}/hard`);
+  },
 };

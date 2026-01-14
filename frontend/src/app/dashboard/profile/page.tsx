@@ -109,10 +109,10 @@ export default function ProfilePage() {
   const handleUpgradePlan = async (planId: number) => {
     try {
       await subscriptionApi.upgrade(planId);
-      setSuccess('Plan upgraded successfully');
+      toast.success('Plan upgraded successfully');
       loadUserData();
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Upgrade failed');
+      toast.error(err.response?.data?.detail || 'Upgrade failed');
     }
   };
 
@@ -180,11 +180,6 @@ export default function ProfilePage() {
                 {error && (
                   <div className="rounded-md bg-red-50 p-3 text-sm text-red-800">
                     {error}
-                  </div>
-                )}
-                {success && (
-                  <div className="rounded-md bg-green-50 p-3 text-sm text-green-800">
-                    {success}
                   </div>
                 )}
                 <div className="space-y-2">

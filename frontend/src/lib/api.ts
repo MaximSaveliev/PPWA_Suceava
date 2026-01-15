@@ -17,6 +17,19 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/auth/login')) {
+        window.location.href = '/auth/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const authApi = {
   login: async (username: string, password: string) => {
     const formData = new URLSearchParams();
